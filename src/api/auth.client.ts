@@ -1,18 +1,24 @@
-import { APIRequestContext, expect } from '@playwright/test';
+import { APIRequestContext, APIResponse, expect } from '@playwright/test';
 
 export class AuthClient {
   constructor(private request: APIRequestContext) {}
 
-  async createToken(): Promise<string> {
-    const response = await this.request.post('/auth', {
-      data: {
-        username: 'admin',
-        password: 'password123',
-      },
-    });
-
+  async createToken(
+    username: string = process.env.API_USERNAME || 'admin',
+    password: string = process.env.API_PASSWORD || 'password123'
+  ): Promise<string> {
+    const response = await this.authenticate(username, password);
     expect(response.status()).toBe(200);
     const body = await response.json();
     return body.token;
+  }
+
+  async authenticate(username: string, password: string): Promise<APIResponse> {
+    return this.request.post('/auth', {
+      data: {
+        username,
+        password,
+      },
+    });
   }
 }

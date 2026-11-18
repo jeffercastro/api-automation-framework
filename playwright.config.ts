@@ -1,4 +1,8 @@
 import { defineConfig } from '@playwright/test';
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 export default defineConfig({
   testDir: './tests',
@@ -10,7 +14,7 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report', open: 'never' }]
   ],
   use: {
-    baseURL: 'https://restful-booker.herokuapp.com',
+    baseURL: process.env.BASE_URL || 'https://restful-booker.herokuapp.com',
     extraHTTPHeaders: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',

@@ -7,7 +7,14 @@
     "test": "playwright test",
     "test:report": "playwright show-report"
   },
-  "keywords": ["playwright", "api-testing", "sdet", "typescript", "json-schema", "ci-cd"],
+  "keywords": [
+    "playwright",
+    "api-testing",
+    "sdet",
+    "typescript",
+    "json-schema",
+    "ci-cd"
+  ],
   "author": "Jeffer Castro",
   "license": "MIT",
   "devDependencies": {
@@ -16,5 +23,8 @@
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.10"
   }
 }
