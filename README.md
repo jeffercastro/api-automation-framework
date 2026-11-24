@@ -21,6 +21,7 @@ Production-ready API test automation framework built with **TypeScript** and **P
 - **Authentication Handling:** Automated token acquisition for sensitive/restricted operations with custom credentials support.
 - **Environment Configuration:** Flexible multi-environment support via `dotenv` (`.env.example`).
 - **SLA & Performance Checks:** Validates response time thresholds (< 2000ms).
+- **Autonomous OpenAPI & Swagger Test Generator:** Scaffolds strongly-typed API clients, AJV JSON schemas, and Playwright contract/health test suites directly from any OpenAPI 3.0/3.1 or Swagger 2.0 specification.
 - **Continuous Integration & Deployment:** Automated test execution on every `push` and `pull_request`, automatically deploying live interactive HTML reports to **GitHub Pages**.
 
 ---
@@ -48,12 +49,18 @@ api-automation-framework/
 │   │   └── booking.client.ts    # Reusable HTTP client methods
 │   ├── data/
 │   │   └── booking.data.ts      # Dynamic payload generators
+│   ├── generator/
+│   │   └── generate-tests.ts    # Autonomous OpenAPI/Swagger test generator
 │   └── schemas/
 │       └── booking.schema.ts    # JSON Schemas for contract testing
 ├── tests/
 │   ├── booking-contract.spec.ts # Contract and SLA response tests
 │   ├── booking-crud.spec.ts     # End-to-end chained lifecycle tests
-│   └── booking-negative.spec.ts # Error handling, 403, 404 & boundary tests
+│   ├── booking-negative.spec.ts # Error handling, 403, 404 & boundary tests
+│   └── generated/               # Output directory for generated test suites
+├── openapi-sample.json          # Example OpenAPI specification
+├── run-generator.bat            # 1-Click launcher to generate tests
+├── test-generated.bat           # 1-Click launcher to execute generated tests
 ├── .env.example                 # Environment variables template
 ├── playwright.config.ts         # Framework configuration with dotenv
 ├── package.json
@@ -88,6 +95,32 @@ npm test
 # View generated interactive HTML report
 npm run test:report
 ```
+
+---
+
+## ⚡ Autonomous OpenAPI & Swagger Test Generator
+
+Accelerate test automation setup for any REST API by generating complete Playwright test suites directly from its OpenAPI 3.0/3.1 or Swagger 2.0 specification.
+
+### What it Generates:
+1. **API Client Classes** (`src/api/<tag>.client.ts`): Typed request wrappers with parameterized endpoints and configurable payloads using Playwright's `APIRequestContext`.
+2. **Contract Schemas** (`src/schemas/<tag>.schema.ts`): AJV-compatible JSON Schemas automatically extracted and resolved from the specification's `responses` definitions.
+3. **Playwright Test Specs** (`tests/generated/<tag>-generated.spec.ts`): Ready-to-run test suites asserting HTTP status codes, JSON Schema compliance, and SLA response time thresholds (< 2500ms).
+
+### Usage:
+
+```bash
+# Generate from a local specification file
+npm run generate:api -- --file openapi-sample.json
+
+# Or generate directly from a remote live endpoint
+npm run generate:api -- --url http://127.0.0.1:8000/openapi.json
+
+# Execute the newly generated test suites
+npm run test:generated
+```
+
+> **Windows Quick Launch:** You can also double-click `run-generator.bat` to generate test suites from `openapi-sample.json` or `test-generated.bat` to run them immediately.
 
 ---
 

@@ -1,0 +1,1476 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "QuantStudio API",
+    "description": "Personal Investment Analysis & Backtesting Platform",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/assets/": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "List Assets",
+        "description": "List all asset tickers currently stored in the database.",
+        "operationId": "list_assets_api_v1_assets__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assets/summary": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Asset Summary",
+        "description": "Return a summary table of all stored assets (date range, row count, prices).",
+        "operationId": "asset_summary_api_v1_assets_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assets/{ticker}/prices": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get Prices",
+        "description": "Return price history for a ticker.\nReturns adjusted close prices by default.",
+        "operationId": "get_prices_api_v1_assets__ticker__prices_get",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM-DD",
+              "title": "Start Date"
+            },
+            "description": "YYYY-MM-DD"
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM-DD",
+              "title": "End Date"
+            },
+            "description": "YYYY-MM-DD"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "Max rows to return",
+              "default": 500,
+              "title": "Limit"
+            },
+            "description": "Max rows to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assets/{ticker}/returns": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get Returns",
+        "description": "Return percentage returns for a ticker at the specified frequency.",
+        "operationId": "get_returns_api_v1_assets__ticker__returns_get",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "frequency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "daily",
+                "monthly",
+                "annual"
+              ],
+              "type": "string",
+              "description": "Return frequency",
+              "default": "daily",
+              "title": "Frequency"
+            },
+            "description": "Return frequency"
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assets/ingest": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Ingest Assets",
+        "description": "Trigger data download and storage for specified tickers.\nDownloads historical prices from Yahoo Finance and stores them in DuckDB.\nFor large requests (many tickers), this may take 1-2 minutes.",
+        "operationId": "ingest_assets_api_v1_assets_ingest_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assets/macro/{series_name}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Get Macro",
+        "description": "Return a macroeconomic data series from FRED.\nAvailable series: cpi_inflation, fed_funds_rate, us_10y_yield, unemployment, gdp_growth",
+        "operationId": "get_macro_api_v1_assets_macro__series_name__get",
+        "parameters": [
+          {
+            "name": "series_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Series Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/backtest/buy-and-hold": {
+      "post": {
+        "tags": [
+          "Backtesting"
+        ],
+        "summary": "Run Buy And Hold",
+        "description": "Buy & Hold strategy: allocate capital once at start and never rebalance.\nUse this as the baseline benchmark for all other strategies.",
+        "operationId": "run_buy_and_hold_api_v1_backtest_buy_and_hold_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuyAndHoldRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/backtest/dca": {
+      "post": {
+        "tags": [
+          "Backtesting"
+        ],
+        "summary": "Run Dca",
+        "description": "Dollar Cost Averaging: invest a fixed amount periodically.\nReduces market-timing risk by buying at all price levels.",
+        "operationId": "run_dca_api_v1_backtest_dca_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DCARequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/backtest/all-weather": {
+      "post": {
+        "tags": [
+          "Backtesting"
+        ],
+        "summary": "Run All Weather",
+        "description": "Ray Dalio's All-Weather Portfolio \u2014 designed to perform in all economic conditions.\nUses 30% stocks, 40% long bonds, 15% intermediate bonds, 15% gold.",
+        "operationId": "run_all_weather_api_v1_backtest_all_weather_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AllWeatherRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/backtest/momentum": {
+      "post": {
+        "tags": [
+          "Backtesting"
+        ],
+        "summary": "Run Momentum",
+        "description": "SMA Crossover Momentum: invest when fast moving average > slow moving average.\nExit to bonds/cash during downtrends to reduce drawdowns.",
+        "operationId": "run_momentum_api_v1_backtest_momentum_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MomentumRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/backtest/optimize": {
+      "post": {
+        "tags": [
+          "Backtesting"
+        ],
+        "summary": "Optimize Portfolio",
+        "description": "Markowitz Efficient Frontier optimization.\nReturns the optimal portfolios (Max Sharpe, Min Variance)\nand the full frontier curve for visualization.",
+        "operationId": "optimize_portfolio_api_v1_backtest_optimize_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptimizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/backtest/compare": {
+      "post": {
+        "tags": [
+          "Backtesting"
+        ],
+        "summary": "Compare All Strategies",
+        "description": "Run and compare all 4 strategies (Buy & Hold, DCA, All-Weather, Momentum)\nover the exact same historical period.\nReturns comparison metrics and synchronized equity curves.",
+        "operationId": "compare_all_strategies_api_v1_backtest_compare_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/simulation/monte-carlo": {
+      "post": {
+        "tags": [
+          "Monte Carlo Simulation"
+        ],
+        "summary": "Run Monte Carlo",
+        "description": "Run a Monte Carlo simulation using Geometric Brownian Motion.\n\nProjects a portfolio's future value across N random paths based on\nhistorical return and volatility statistics.\n\nReturns percentile bands (5th, 25th, 50th, 75th, 95th) for visualization\nas an 'uncertainty cone' chart.",
+        "operationId": "run_monte_carlo_api_v1_simulation_monte_carlo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonteCarloRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/simulation/sensitivity": {
+      "post": {
+        "tags": [
+          "Monte Carlo Simulation"
+        ],
+        "summary": "Run Sensitivity",
+        "description": "Run sensitivity analysis across different market scenarios.\nCompares pessimistic, historical, and optimistic return assumptions.",
+        "operationId": "run_sensitivity_api_v1_simulation_sensitivity_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SensitivityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/simulation/probability": {
+      "post": {
+        "tags": [
+          "Monte Carlo Simulation"
+        ],
+        "summary": "Probability Analysis",
+        "description": "Compute the probability of reaching specific portfolio value targets.\n\nExample: \"What is the probability of having $500k after 20 years\ninvesting $500/month starting with $10k?\"",
+        "operationId": "probability_analysis_api_v1_simulation_probability_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProbabilityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "summary": "Dashboard",
+        "operationId": "dashboard_dashboard_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AllWeatherRequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "default": [
+              "SPY",
+              "BND",
+              "GLD"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "default": "2015-01-01"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "initial_capital": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Initial Capital",
+            "default": 10000
+          },
+          "annual_fee_bps": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Annual Fee Bps",
+            "description": "Annual fee in basis points",
+            "default": 10.0
+          },
+          "include_timeseries": {
+            "type": "boolean",
+            "title": "Include Timeseries",
+            "default": true
+          },
+          "rebalance_frequency": {
+            "type": "string",
+            "pattern": "^(monthly|quarterly|annual)$",
+            "title": "Rebalance Frequency",
+            "default": "quarterly"
+          }
+        },
+        "type": "object",
+        "title": "AllWeatherRequest"
+      },
+      "BuyAndHoldRequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "default": [
+              "SPY",
+              "BND",
+              "GLD"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "default": "2015-01-01"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "initial_capital": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Initial Capital",
+            "default": 10000
+          },
+          "annual_fee_bps": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Annual Fee Bps",
+            "description": "Annual fee in basis points",
+            "default": 10.0
+          },
+          "include_timeseries": {
+            "type": "boolean",
+            "title": "Include Timeseries",
+            "default": true
+          },
+          "weights": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights"
+          }
+        },
+        "type": "object",
+        "title": "BuyAndHoldRequest"
+      },
+      "CompareRequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "default": [
+              "SPY",
+              "BND",
+              "GLD"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "default": "2015-01-01"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "initial_capital": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Initial Capital",
+            "default": 10000
+          },
+          "annual_fee_bps": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Annual Fee Bps",
+            "description": "Annual fee in basis points",
+            "default": 10.0
+          },
+          "include_timeseries": {
+            "type": "boolean",
+            "title": "Include Timeseries",
+            "default": true
+          },
+          "periodic_investment": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Periodic Investment",
+            "default": 500.0
+          },
+          "frequency": {
+            "type": "string",
+            "pattern": "^(weekly|monthly|quarterly)$",
+            "title": "Frequency",
+            "default": "monthly"
+          }
+        },
+        "type": "object",
+        "title": "CompareRequest"
+      },
+      "DCARequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "default": [
+              "SPY",
+              "BND",
+              "GLD"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "default": "2015-01-01"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "initial_capital": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Initial Capital",
+            "default": 10000
+          },
+          "annual_fee_bps": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Annual Fee Bps",
+            "description": "Annual fee in basis points",
+            "default": 10.0
+          },
+          "include_timeseries": {
+            "type": "boolean",
+            "title": "Include Timeseries",
+            "default": true
+          },
+          "periodic_investment": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Periodic Investment",
+            "default": 500.0
+          },
+          "frequency": {
+            "type": "string",
+            "pattern": "^(weekly|monthly|quarterly)$",
+            "title": "Frequency",
+            "default": "monthly"
+          },
+          "weights": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights"
+          }
+        },
+        "type": "object",
+        "title": "DCARequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "IngestRequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "default": [
+              "SPY",
+              "QQQ",
+              "VT",
+              "VTI",
+              "BND",
+              "TLT",
+              "IEF",
+              "GLD",
+              "SLV",
+              "BTC-USD",
+              "ETH-USD"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "default": "2010-01-01"
+          },
+          "force_refresh": {
+            "type": "boolean",
+            "title": "Force Refresh",
+            "default": false
+          },
+          "include_macro": {
+            "type": "boolean",
+            "title": "Include Macro",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "IngestRequest"
+      },
+      "IngestResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "results": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Results"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "results",
+          "message"
+        ],
+        "title": "IngestResponse"
+      },
+      "MomentumRequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "default": [
+              "SPY",
+              "BND",
+              "GLD"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "default": "2015-01-01"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "initial_capital": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Initial Capital",
+            "default": 10000
+          },
+          "annual_fee_bps": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Annual Fee Bps",
+            "description": "Annual fee in basis points",
+            "default": 10.0
+          },
+          "include_timeseries": {
+            "type": "boolean",
+            "title": "Include Timeseries",
+            "default": true
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker",
+            "default": "SPY"
+          },
+          "fast_sma": {
+            "type": "integer",
+            "exclusiveMinimum": 5.0,
+            "title": "Fast Sma",
+            "default": 50
+          },
+          "slow_sma": {
+            "type": "integer",
+            "exclusiveMinimum": 20.0,
+            "title": "Slow Sma",
+            "default": 200
+          },
+          "cash_ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Ticker",
+            "default": "BND"
+          }
+        },
+        "type": "object",
+        "title": "MomentumRequest"
+      },
+      "MonteCarloRequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "default": [
+              "SPY",
+              "BND",
+              "GLD"
+            ]
+          },
+          "weights": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights"
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "default": "2015-01-01"
+          },
+          "initial_value": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Initial Value",
+            "description": "Starting portfolio value (USD)",
+            "default": 10000
+          },
+          "horizon_years": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Horizon Years",
+            "description": "Years to simulate",
+            "default": 10
+          },
+          "monthly_contribution": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Monthly Contribution",
+            "description": "Monthly additional investment (USD)",
+            "default": 0
+          },
+          "n_paths": {
+            "type": "integer",
+            "maximum": 50000.0,
+            "minimum": 100.0,
+            "title": "N Paths",
+            "description": "Number of simulation paths",
+            "default": 5000
+          },
+          "inflation_rate": {
+            "type": "number",
+            "maximum": 0.2,
+            "minimum": 0.0,
+            "title": "Inflation Rate",
+            "description": "Annual inflation rate",
+            "default": 0.035
+          },
+          "random_seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Random Seed",
+            "default": 42
+          },
+          "include_cone": {
+            "type": "boolean",
+            "title": "Include Cone",
+            "default": true
+          },
+          "cone_points": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 50.0,
+            "title": "Cone Points",
+            "default": 200
+          },
+          "include_full_paths": {
+            "type": "boolean",
+            "title": "Include Full Paths",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "MonteCarloRequest"
+      },
+      "OptimizeRequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "default": [
+              "SPY",
+              "QQQ",
+              "BND",
+              "GLD",
+              "TLT"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "default": "2015-01-01"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "n_frontier_points": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 10.0,
+            "title": "N Frontier Points",
+            "default": 50
+          },
+          "n_random_portfolios": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 100.0,
+            "title": "N Random Portfolios",
+            "default": 2000
+          }
+        },
+        "type": "object",
+        "title": "OptimizeRequest"
+      },
+      "ProbabilityRequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "default": [
+              "SPY",
+              "BND",
+              "GLD"
+            ]
+          },
+          "weights": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights"
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "default": "2015-01-01"
+          },
+          "initial_value": {
+            "type": "number",
+            "title": "Initial Value",
+            "default": 10000
+          },
+          "monthly_contribution": {
+            "type": "number",
+            "title": "Monthly Contribution",
+            "default": 500
+          },
+          "horizon_years": {
+            "type": "integer",
+            "title": "Horizon Years",
+            "default": 20
+          },
+          "target_values": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Target Values",
+            "default": [
+              50000,
+              100000,
+              250000,
+              500000,
+              1000000
+            ]
+          },
+          "n_paths": {
+            "type": "integer",
+            "title": "N Paths",
+            "default": 5000
+          }
+        },
+        "type": "object",
+        "title": "ProbabilityRequest"
+      },
+      "SensitivityRequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers",
+            "default": [
+              "SPY",
+              "BND",
+              "GLD"
+            ]
+          },
+          "weights": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights"
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "default": "2015-01-01"
+          },
+          "initial_value": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Initial Value",
+            "default": 10000
+          },
+          "monthly_contribution": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Monthly Contribution",
+            "default": 500
+          },
+          "horizon_years": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Horizon Years",
+            "default": 20
+          },
+          "n_paths": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 100.0,
+            "title": "N Paths",
+            "default": 2000
+          }
+        },
+        "type": "object",
+        "title": "SensitivityRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

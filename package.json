@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "playwright test",
-    "test:report": "playwright show-report"
+    "test:generated": "playwright test tests/generated",
+    "test:report": "playwright show-report",
+    "generate:api": "node --experimental-strip-types src/generator/generate-tests.ts"
   },
   "keywords": [
     "playwright",
