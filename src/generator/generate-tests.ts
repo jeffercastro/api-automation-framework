@@ -313,6 +313,205 @@ ${testCases}
 `;
 }
 
+function defaultPathArg(paramName: string): string {
+  const lower = paramName.toLowerCase();
+  if (lower.includes('series_name') || lower.includes('series')) return "'cpi_inflation'";
+  if (lower.includes('ticker')) return "'SPY'";
+  if (lower.includes('id')) return '1';
+  return `'test_${paramName}'`;
+}
+
+function buildBaselinePayload(schema: any, spec: OpenAPISpec, depth = 0): Record<string, any> {
+  if (!schema || typeof schema !== 'object' || depth > 3) return {};
+  const resolved = schema.$ref ? resolveRef(schema.$ref, spec) : schema;
+  const props = resolved.properties || {};
+  const payload: Record<string, any> = {};
+
+  for (const [key, rawProp] of Object.entries<any>(props)) {
+    const prop = rawProp.$ref ? resolveRef(rawProp.$ref, spec) : rawProp;
+    if (prop.default !== undefined) {
+      payload[key] = prop.default;
+    } else if (prop.example !== undefined) {
+      payload[key] = prop.example;
+    } else if (Array.isArray(prop.enum) && prop.enum.length > 0) {
+      payload[key] = prop.enum[0];
+    } else if (prop.type === 'integer' || prop.type === 'number') {
+      const minVal = typeof prop.exclusiveMinimum === 'number'
+        ? prop.exclusiveMinimum + 1
+        : (typeof prop.minimum === 'number' ? prop.minimum + 1 : 10);
+      payload[key] = minVal;
+    } else if (prop.type === 'boolean') {
+      payload[key] = true;
+    } else if (prop.type === 'array') {
+      payload[key] = ['SPY'];
+    } else if (prop.type === 'object') {
+      payload[key] = buildBaselinePayload(prop, spec, depth + 1);
+    } else if (prop.type === 'string') {
+      payload[key] = key.includes('date') ? '2024-01-01' : 'sample_value';
+    }
+  }
+  return payload;
+}
+
+interface NegativeCase {
+  label: string;
+  pathArgs: string[];
+  payload?: any;
+  strictClientError: boolean;
+}
+
+function generateNegativeMutations(op: ParsedOperation, spec: OpenAPISpec): NegativeCase[] {
+  const cases: NegativeCase[] = [];
+  const validPathArgs = op.pathParams.map(defaultPathArg);
+
+  // 1. Invalid path parameter fuzzing
+  if (op.pathParams.length > 0) {
+    const invalidPathArgs = op.pathParams.map(() => "'__invalid_fuzz_999999__'");
+    cases.push({
+      label: `invalid path param (${op.pathParams.join(', ')}) returns 4xx without 500`,
+      pathArgs: invalidPathArgs,
+      strictClientError: true,
+    });
+  }
+
+  // 2. Request body mutations for write methods
+  if (['post', 'put', 'patch'].includes(op.method)) {
+    const rawSchema = op.requestBodySchema;
+    const schema = rawSchema?.$ref ? resolveRef(rawSchema.$ref, spec) : rawSchema;
+
+    if (schema && schema.properties) {
+      const baseline = buildBaselinePayload(schema, spec);
+      const required: string[] = Array.isArray(schema.required) ? schema.required : [];
+
+      if (required.length > 0) {
+        cases.push({
+          label: 'empty payload {} rejects missing required fields (400/422)',
+          pathArgs: validPathArgs,
+          payload: {},
+          strictClientError: true,
+        });
+
+        for (const reqField of required.slice(0, 2)) {
+          const mutated = { ...baseline };
+          delete mutated[reqField];
+          cases.push({
+            label: `missing required field "${reqField}" returns 400/422`,
+            pathArgs: validPathArgs,
+            payload: mutated,
+            strictClientError: true,
+          });
+        }
+      }
+
+      // Type mismatch fuzzing (first numeric, boolean, or array property)
+      let addedTypeFuzz = false;
+      let addedBoundaryFuzz = false;
+
+      for (const [key, rawProp] of Object.entries<any>(schema.properties)) {
+        const prop = rawProp.$ref ? resolveRef(rawProp.$ref, spec) : rawProp;
+
+        if (!addedTypeFuzz && (prop.type === 'number' || prop.type === 'integer' || prop.type === 'boolean' || prop.type === 'array')) {
+          const badVal = prop.type === 'boolean'
+            ? '__not_a_boolean__'
+            : (prop.type === 'array' ? '__not_an_array__' : '__not_a_number__');
+          cases.push({
+            label: `type mismatch on "${key}" (${prop.type} <- string) returns 400/422`,
+            pathArgs: validPathArgs,
+            payload: { ...baseline, [key]: badVal },
+            strictClientError: true,
+          });
+          addedTypeFuzz = true;
+        }
+
+        if (!addedBoundaryFuzz) {
+          if (typeof prop.exclusiveMinimum === 'number' || typeof prop.minimum === 'number') {
+            const minBound = typeof prop.exclusiveMinimum === 'number' ? prop.exclusiveMinimum : prop.minimum;
+            cases.push({
+              label: `boundary violation on "${key}" (< min ${minBound}) returns 400/422`,
+              pathArgs: validPathArgs,
+              payload: { ...baseline, [key]: minBound - 10 },
+              strictClientError: true,
+            });
+            addedBoundaryFuzz = true;
+          } else if (Array.isArray(prop.enum) && prop.enum.length > 0) {
+            cases.push({
+              label: `invalid enum value on "${key}" returns 400/422`,
+              pathArgs: validPathArgs,
+              payload: { ...baseline, [key]: '__INVALID_ENUM_VALUE__' },
+              strictClientError: true,
+            });
+            addedBoundaryFuzz = true;
+          } else if (typeof prop.pattern === 'string') {
+            cases.push({
+              label: `pattern violation on "${key}" returns 400/422`,
+              pathArgs: validPathArgs,
+              payload: { ...baseline, [key]: '__INVALID_PATTERN__' },
+              strictClientError: true,
+            });
+            addedBoundaryFuzz = true;
+          }
+        }
+
+        if (addedTypeFuzz && addedBoundaryFuzz) break;
+      }
+    } else {
+      cases.push({
+        label: 'unexpected fuzz payload does not cause 500 server crash',
+        pathArgs: validPathArgs,
+        payload: { __fuzz_unexpected__: true },
+        strictClientError: false,
+      });
+    }
+  }
+
+  return cases;
+}
+
+function generateNegativeTestSpecCode(tag: string, operations: ParsedOperation[], spec: OpenAPISpec): string | null {
+  const className = `${toPascalCase(tag)}Client`;
+  const clientFileName = `${toKebabCase(tag)}.client`;
+
+  const blocks: string[] = [];
+
+  for (const op of operations) {
+    const fnName = cleanMethodName(op.method, op.path, op.operationId);
+    const mutations = generateNegativeMutations(op, spec);
+
+    for (const mut of mutations) {
+      const callArgs = [...mut.pathArgs];
+      if (['post', 'put', 'patch'].includes(op.method)) {
+        callArgs.push(JSON.stringify(mut.payload ?? {}));
+      }
+
+      const statusAssert = mut.strictClientError
+        ? `    expect([400, 404, 422], \`Expected 4xx validation error for ${op.path}\`).toContain(response.status());`
+        : `    expect(response.status(), \`Expected non-5xx status for ${op.path}\`).toBeLessThan(500);`;
+
+      blocks.push(`  test('${op.method.toUpperCase()} ${op.path} — ${mut.label.replace(/'/g, "\\'")}', async ({ request }) => {
+    const client = new ${className}(request);
+    const response = await client.${fnName}(${callArgs.join(', ')});
+
+    expect(response.status(), 'API must never crash with 5xx on malformed/boundary input').toBeLessThan(500);
+${statusAssert}
+  });`);
+    }
+  }
+
+  if (blocks.length === 0) return null;
+
+  return `/**
+ * AUTO-GENERATED NEGATIVE & FUZZING PLAYWRIGHT TEST SUITE
+ * Resource: ${tag}
+ */
+import { test, expect } from '@playwright/test';
+import { ${className} } from '../../src/api/${clientFileName}';
+
+test.describe('${toPascalCase(tag)} API — Autonomous Negative & Boundary Fuzz Tests', () => {
+${blocks.join('\n\n')}
+});
+`;
+}
+
 // ─── Main Execution ───────────────────────────────────────────────────────────
 
 async function main() {
@@ -322,21 +521,36 @@ async function main() {
 
   const args = process.argv.slice(2);
   let specPath = path.resolve(__dirname, '../../openapi-sample.json');
+  let specUrl = '';
+  const includeNegative = args.includes('--negative');
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--file' && args[i + 1]) {
       specPath = path.resolve(process.cwd(), args[i + 1]);
     }
+    if (args[i] === '--url' && args[i + 1]) {
+      specUrl = args[i + 1];
+    }
   }
 
-  if (!fs.existsSync(specPath)) {
-    console.error(`Error: Spec file not found at ${specPath}`);
-    console.log('Usage: node --experimental-strip-types src/generator/generate-tests.ts [--file path/to/spec.json]');
-    process.exit(1);
+  let rawContent: string;
+  if (specUrl) {
+    console.log(`[1/4] Fetching specification from URL: ${specUrl}`);
+    const resp = await fetch(specUrl);
+    if (!resp.ok) {
+      throw new Error(`Failed to fetch OpenAPI spec from ${specUrl} (HTTP ${resp.status})`);
+    }
+    rawContent = await resp.text();
+  } else {
+    if (!fs.existsSync(specPath)) {
+      console.error(`Error: Spec file not found at ${specPath}`);
+      console.log('Usage: node --experimental-strip-types src/generator/generate-tests.ts [--file path/to/spec.json] [--url http://...] [--negative]');
+      process.exit(1);
+    }
+    console.log(`[1/4] Reading specification from: ${specPath}`);
+    rawContent = fs.readFileSync(specPath, 'utf-8');
   }
 
-  console.log(`[1/4] Reading specification from: ${specPath}`);
-  const rawContent = fs.readFileSync(specPath, 'utf-8');
   const spec: OpenAPISpec = JSON.parse(rawContent);
 
   const title = spec.info?.title || 'API';
@@ -360,6 +574,7 @@ async function main() {
   console.log('\n[3/4] Generating Clients, Schemas, and Test Suites...');
 
   let totalOperations = 0;
+  let negativeSuitesCount = 0;
 
   for (const tag of tags) {
     const ops = operationsByTag[tag];
@@ -376,19 +591,31 @@ async function main() {
     const schemaPath = path.join(schemaDir, `${kebabTag}.schema.ts`);
     fs.writeFileSync(schemaPath, schemaCode, 'utf-8');
 
-    // 3. Generate Test Spec
+    // 3. Generate Positive Contract Test Spec
     const testCode = generateTestSpecCode(tag, ops);
     const testPath = path.join(testsDir, `${kebabTag}-generated.spec.ts`);
     fs.writeFileSync(testPath, testCode, 'utf-8');
 
-    console.log(`  ✓ Tag [${tag}]: ${ops.length} endpoints → ${kebabTag}.client.ts & ${kebabTag}-generated.spec.ts`);
+    // 4. Generate Negative & Fuzzing Test Spec (if --negative)
+    let negLabel = '';
+    if (includeNegative) {
+      const negCode = generateNegativeTestSpecCode(tag, ops, spec);
+      if (negCode) {
+        const negPath = path.join(testsDir, `${kebabTag}-negative-generated.spec.ts`);
+        fs.writeFileSync(negPath, negCode, 'utf-8');
+        negativeSuitesCount++;
+        negLabel = ` & ${kebabTag}-negative-generated.spec.ts`;
+      }
+    }
+
+    console.log(`  ✓ Tag [${tag}]: ${ops.length} endpoints → ${kebabTag}.client.ts & ${kebabTag}-generated.spec.ts${negLabel}`);
   }
 
   console.log('\n[4/4] Generation Complete! Summary:');
   console.log(`  • Total Operations Processed: ${totalOperations}`);
   console.log(`  • Clients Generated:          ${tags.length} files in src/api/`);
   console.log(`  • Schemas Generated:          ${tags.length} files in src/schemas/`);
-  console.log(`  • Playwright Test Suites:     ${tags.length} suites in tests/generated/`);
+  console.log(`  • Playwright Test Suites:     ${tags.length} positive${includeNegative ? ` + ${negativeSuitesCount} negative/fuzz` : ''} suites in tests/generated/`);
   console.log('\nNext steps:');
   console.log('  To execute the generated tests:');
   console.log('    npx playwright test tests/generated/');

@@ -106,15 +106,19 @@ Accelerate test automation setup for any REST API by generating complete Playwri
 1. **API Client Classes** (`src/api/<tag>.client.ts`): Typed request wrappers with parameterized endpoints and configurable payloads using Playwright's `APIRequestContext`.
 2. **Contract Schemas** (`src/schemas/<tag>.schema.ts`): AJV-compatible JSON Schemas automatically extracted and resolved from the specification's `responses` definitions.
 3. **Playwright Test Specs** (`tests/generated/<tag>-generated.spec.ts`): Ready-to-run test suites asserting HTTP status codes, JSON Schema compliance, and SLA response time thresholds (< 2500ms).
+4. **Negative & Boundary Fuzz Suites (`--negative`)** (`tests/generated/<tag>-negative-generated.spec.ts`): Automatically mutates required fields, data types, boundary constraints (`minimum`/`exclusiveMinimum`/`enum`/`pattern`), and path parameters to verify `400/404/422` validation and zero `5xx` server crashes.
 
 ### Usage:
 
 ```bash
-# Generate from a local specification file
+# Generate positive contract suites from a local specification file
 npm run generate:api -- --file openapi-sample.json
 
+# Generate BOTH positive contract + negative/fuzzing test suites
+npm run generate:negative -- --file openapi-sample.json
+
 # Or generate directly from a remote live endpoint
-npm run generate:api -- --url http://127.0.0.1:8000/openapi.json
+npm run generate:api -- --url http://127.0.0.1:8000/openapi.json --negative
 
 # Execute the newly generated test suites
 npm run test:generated
