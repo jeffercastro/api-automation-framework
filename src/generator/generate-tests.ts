@@ -512,6 +512,55 @@ ${blocks.join('\n\n')}
 `;
 }
 
+function generatePerfTestSpecCode(tag: string, operations: ParsedOperation[], spec: OpenAPISpec): string | null {
+  const className = `${toPascalCase(tag)}Client`;
+  const clientFileName = `${toKebabCase(tag)}.client`;
+
+  const benchOps = operations.filter(
+    (op) => op.method !== 'delete' && !op.path.includes('ingest')
+  );
+  if (benchOps.length === 0) return null;
+
+  const blocks = benchOps.map((op) => {
+    const fnName = cleanMethodName(op.method, op.path, op.operationId);
+    const args: string[] = op.pathParams.map(defaultPathArg);
+
+    if (['post', 'put', 'patch'].includes(op.method)) {
+      const rawSchema = op.requestBodySchema;
+      const resolved = rawSchema?.$ref ? resolveRef(rawSchema.$ref, spec) : rawSchema;
+      const samplePayload = resolved?.properties ? buildBaselinePayload(resolved, spec) : {};
+      args.push(JSON.stringify(samplePayload));
+    }
+
+    const p95Limit = op.path.includes('monte-carlo') || op.path.includes('optimize') ? 10000 : 2500;
+
+    return `  test('${op.method.toUpperCase()} ${op.path} — Load & Latency Benchmark (P95 < ${p95Limit}ms)', async ({ request }) => {
+    const client = new ${className}(request);
+    const metrics = await runLoadBenchmark({
+      label: '${op.method.toUpperCase()} ${op.path}',
+      executeRequest: () => client.${fnName}(${args.join(', ')}),
+    });
+
+    expect(metrics.errorRatePct, 'Server 5xx/network error rate under load must be 0%').toBe(0);
+    expect(metrics.p95Ms, 'P95 latency SLA exceeded under concurrency').toBeLessThan(${p95Limit});
+    expect(metrics.rps, 'Throughput (RPS) must be positive').toBeGreaterThan(0);
+  });`;
+  });
+
+  return `/**
+ * AUTO-GENERATED PERFORMANCE & LOAD BENCHMARK SUITE
+ * Resource: ${tag}
+ */
+import { test, expect } from '@playwright/test';
+import { ${className} } from '../../src/api/${clientFileName}';
+import { runLoadBenchmark } from '../../src/utils/perf-runner';
+
+test.describe('${toPascalCase(tag)} API — Performance & Latency Benchmarks', () => {
+${blocks.join('\n\n')}
+});
+`;
+}
+
 // ─── Main Execution ───────────────────────────────────────────────────────────
 
 async function main() {
@@ -523,6 +572,7 @@ async function main() {
   let specPath = path.resolve(__dirname, '../../openapi-sample.json');
   let specUrl = '';
   const includeNegative = args.includes('--negative');
+  const includePerf = args.includes('--perf');
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--file' && args[i + 1]) {
@@ -575,6 +625,7 @@ async function main() {
 
   let totalOperations = 0;
   let negativeSuitesCount = 0;
+  let perfSuitesCount = 0;
 
   for (const tag of tags) {
     const ops = operationsByTag[tag];
@@ -597,25 +648,36 @@ async function main() {
     fs.writeFileSync(testPath, testCode, 'utf-8');
 
     // 4. Generate Negative & Fuzzing Test Spec (if --negative)
-    let negLabel = '';
+    let extraLabels = '';
     if (includeNegative) {
       const negCode = generateNegativeTestSpecCode(tag, ops, spec);
       if (negCode) {
         const negPath = path.join(testsDir, `${kebabTag}-negative-generated.spec.ts`);
         fs.writeFileSync(negPath, negCode, 'utf-8');
         negativeSuitesCount++;
-        negLabel = ` & ${kebabTag}-negative-generated.spec.ts`;
+        extraLabels += ` & ${kebabTag}-negative-generated.spec.ts`;
       }
     }
 
-    console.log(`  ✓ Tag [${tag}]: ${ops.length} endpoints → ${kebabTag}.client.ts & ${kebabTag}-generated.spec.ts${negLabel}`);
+    // 5. Generate Performance & Load Benchmark Spec (if --perf)
+    if (includePerf) {
+      const perfCode = generatePerfTestSpecCode(tag, ops, spec);
+      if (perfCode) {
+        const perfPath = path.join(testsDir, `${kebabTag}-perf-generated.spec.ts`);
+        fs.writeFileSync(perfPath, perfCode, 'utf-8');
+        perfSuitesCount++;
+        extraLabels += ` & ${kebabTag}-perf-generated.spec.ts`;
+      }
+    }
+
+    console.log(`  ✓ Tag [${tag}]: ${ops.length} endpoints → ${kebabTag}.client.ts & ${kebabTag}-generated.spec.ts${extraLabels}`);
   }
 
   console.log('\n[4/4] Generation Complete! Summary:');
   console.log(`  • Total Operations Processed: ${totalOperations}`);
   console.log(`  • Clients Generated:          ${tags.length} files in src/api/`);
   console.log(`  • Schemas Generated:          ${tags.length} files in src/schemas/`);
-  console.log(`  • Playwright Test Suites:     ${tags.length} positive${includeNegative ? ` + ${negativeSuitesCount} negative/fuzz` : ''} suites in tests/generated/`);
+  console.log(`  • Playwright Test Suites:     ${tags.length} positive${includeNegative ? ` + ${negativeSuitesCount} negative/fuzz` : ''}${includePerf ? ` + ${perfSuitesCount} perf` : ''} suites in tests/generated/`);
   console.log('\nNext steps:');
   console.log('  To execute the generated tests:');
   console.log('    npx playwright test tests/generated/');

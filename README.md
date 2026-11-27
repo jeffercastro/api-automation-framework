@@ -51,8 +51,10 @@ api-automation-framework/
 │   │   └── booking.data.ts      # Dynamic payload generators
 │   ├── generator/
 │   │   └── generate-tests.ts    # Autonomous OpenAPI/Swagger test generator
-│   └── schemas/
-│       └── booking.schema.ts    # JSON Schemas for contract testing
+│   ├── schemas/
+│   │   └── booking.schema.ts    # JSON Schemas for contract testing
+│   └── utils/
+│       └── perf-runner.ts       # Concurrent load & latency benchmark runner (P50/P95/P99, RPS)
 ├── tests/
 │   ├── booking-contract.spec.ts # Contract and SLA response tests
 │   ├── booking-crud.spec.ts     # End-to-end chained lifecycle tests
@@ -107,6 +109,7 @@ Accelerate test automation setup for any REST API by generating complete Playwri
 2. **Contract Schemas** (`src/schemas/<tag>.schema.ts`): AJV-compatible JSON Schemas automatically extracted and resolved from the specification's `responses` definitions.
 3. **Playwright Test Specs** (`tests/generated/<tag>-generated.spec.ts`): Ready-to-run test suites asserting HTTP status codes, JSON Schema compliance, and SLA response time thresholds (< 2500ms).
 4. **Negative & Boundary Fuzz Suites (`--negative`)** (`tests/generated/<tag>-negative-generated.spec.ts`): Automatically mutates required fields, data types, boundary constraints (`minimum`/`exclusiveMinimum`/`enum`/`pattern`), and path parameters to verify `400/404/422` validation and zero `5xx` server crashes.
+5. **Load & Latency Benchmarks (`--perf`)** (`tests/generated/<tag>-perf-generated.spec.ts`): Runs concurrent worker-pool benchmarks per endpoint and reports **RPS**, **P50 / P95 / P99 latencies**, and **5xx error rate** (`PERF_CONCURRENCY`, `PERF_ITERATIONS`).
 
 ### Usage:
 
@@ -117,11 +120,15 @@ npm run generate:api -- --file openapi-sample.json
 # Generate BOTH positive contract + negative/fuzzing test suites
 npm run generate:negative -- --file openapi-sample.json
 
-# Or generate directly from a remote live endpoint
-npm run generate:api -- --url http://127.0.0.1:8000/openapi.json --negative
+# Generate load & latency benchmark suites
+npm run generate:perf -- --file openapi-sample.json
 
-# Execute the newly generated test suites
+# Or generate directly from a remote live endpoint
+npm run generate:api -- --url http://127.0.0.1:8000/openapi.json --negative --perf
+
+# Execute the newly generated test suites or performance benchmarks
 npm run test:generated
+npm run test:perf
 ```
 
 > **Windows Quick Launch:** You can also double-click `run-generator.bat` to generate test suites from `openapi-sample.json` or `test-generated.bat` to run them immediately.

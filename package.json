@@ -6,9 +6,11 @@
   "scripts": {
     "test": "playwright test",
     "test:generated": "playwright test tests/generated",
+    "test:perf": "playwright test tests/generated --workers=1 --grep \"Load & Latency Benchmark\"",
     "test:report": "playwright show-report",
     "generate:api": "node --experimental-strip-types src/generator/generate-tests.ts",
-    "generate:negative": "node --experimental-strip-types src/generator/generate-tests.ts --negative"
+    "generate:negative": "node --experimental-strip-types src/generator/generate-tests.ts --negative",
+    "generate:perf": "node --experimental-strip-types src/generator/generate-tests.ts --perf"
   },
   "keywords": [
     "playwright",
